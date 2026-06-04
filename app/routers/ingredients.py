@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import asc, desc
+from typing import List, Optional
+from math import ceil
 from app.database import get_db
 from app.models.models import User, Ingredient
 from app.schemas.ingredient import IngredientCreate, IngredientUpdate, IngredientResponse
+from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user
 from app.utils.exceptions import IngredientNotFound, DuplicateIngredient, NotOwner
 
@@ -38,16 +41,53 @@ def create_ingredient(
     return new_ingredient
 
 
-@router.get("/", response_model=List[IngredientResponse])
+@router.get("/", response_model=PaginatedResponse[IngredientResponse])
 def get_ingredients(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    sort_by: Optional[str] = Query(None, regex="^(name|category|price_per_unit|created_at)$"),
+    order: Optional[str] = Query("asc", regex="^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100)
 ):
-    ingredients = db.query(Ingredient).filter(
-        Ingredient.owner_id == current_user.id
-    ).all()
+    query = db.query(Ingredient).filter(Ingredient.owner_id == current_user.id)
 
-    return ingredients
+    if category:
+        query = query.filter(Ingredient.category == category)
+
+    if search:
+        query = query.filter(Ingredient.name.ilike(f"%{search}%"))
+
+    if min_price is not None:
+        query = query.filter(Ingredient.price_per_unit >= min_price)
+
+    if max_price is not None:
+        query = query.filter(Ingredient.price_per_unit <= max_price)
+
+    total = query.count()
+
+    if sort_by:
+        sort_column = getattr(Ingredient, sort_by)
+        if order == "desc":
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
+
+    offset = (page - 1) * size
+    ingredients = query.offset(offset).limit(size).all()
+    pages = ceil(total / size) if size > 0 else 0
+
+    return PaginatedResponse(
+        items=ingredients,
+        total=total,
+        page=page,
+        size=size,
+        pages=pages
+    )
 
 
 @router.get("/{ingredient_id}", response_model=IngredientResponse)

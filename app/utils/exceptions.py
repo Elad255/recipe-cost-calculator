@@ -31,3 +31,11 @@ class NotOwner(RecipeAppException):
             error="not_owner",
             message=f"You don't have permission to access this {resource}"
         )
+
+class RecipeNotFound(RecipeAppException):
+    def __init__(self, recipe_id: int):
+        super().__init__(
+            status_code=404,
+            error="recipe_not_found",
+            message=f"Recipe with ID {recipe_id} does not exist"
+        )
