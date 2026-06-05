@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from app.routers import auth
 from app.routers import ingredients
 from app.routers import recipes
+from app.routers import analysis
 from app.utils.exceptions import RecipeAppException
 
 app = FastAPI(
@@ -26,6 +27,7 @@ async def recipe_app_exception_handler(request, exc):
 app.include_router(auth.router)
 app.include_router(ingredients.router)
 app.include_router(recipes.router)
+app.include_router(analysis.router)
 
 
 @app.get("/health")
