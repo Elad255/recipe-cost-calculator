@@ -1,7 +1,83 @@
 import pytest
 from unittest.mock import MagicMock
 from datetime import datetime
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.main import app
+from app.database import get_db
+from app.models.models import Base
 
+
+TEST_DATABASE_URL = "postgresql://postgres:postgres@db:5432/recipe_cost_test_db"
+
+engine = create_engine(TEST_DATABASE_URL)
+TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(scope="function")
+def test_db():
+    Base.metadata.create_all(bind=engine)
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def client(test_db):
+    def override_get_db():
+        try:
+            yield test_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def registered_user(client):
+    response = client.post("/auth/register", json={
+        "email": "chef@kitchen.com",
+        "password": "shakshuka123"
+    })
+    return response.json()
+
+
+@pytest.fixture
+def auth_headers(client):
+    client.post("/auth/register", json={
+        "email": "chef@kitchen.com",
+        "password": "shakshuka123"
+    })
+    response = client.post("/auth/login", json={
+        "email": "chef@kitchen.com",
+        "password": "shakshuka123"
+    })
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def second_user_headers(client):
+    client.post("/auth/register", json={
+        "email": "chef2@kitchen.com",
+        "password": "falafel456"
+    })
+    response = client.post("/auth/login", json={
+        "email": "chef2@kitchen.com",
+        "password": "falafel456"
+    })
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+# === MOCK FIXTURES (kept from Day 7 for unit tests) ===
 
 @pytest.fixture
 def mock_db():

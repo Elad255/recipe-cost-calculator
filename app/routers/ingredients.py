@@ -4,7 +4,7 @@ from sqlalchemy import asc, desc
 from typing import List, Optional
 from math import ceil
 from app.database import get_db
-from app.models.models import User, Ingredient
+from app.models.models import User, Ingredient, PriceHistory
 from app.schemas.ingredient import IngredientCreate, IngredientUpdate, IngredientResponse
 from app.schemas.common import PaginatedResponse
 from app.utils.deps import get_current_user
@@ -125,6 +125,15 @@ def update_ingredient(
 
     if ingredient.owner_id != current_user.id:
         raise NotOwner("ingredient")
+
+    if ingredient_data.price_per_unit is not None and ingredient_data.price_per_unit != ingredient.price_per_unit:
+        price_record = PriceHistory(
+            ingredient_id=ingredient.id,
+            old_price=ingredient.price_per_unit,
+            new_price=ingredient_data.price_per_unit,
+            owner_id=current_user.id
+        )
+        db.add(price_record)
 
     if ingredient_data.name is not None:
         ingredient.name = ingredient_data.name
