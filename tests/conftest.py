@@ -9,8 +9,10 @@ from app.database import get_db
 from app.models.models import Base
 
 
-TEST_DATABASE_URL = "postgresql://postgres:postgres@db:5432/recipe_cost_test_db"
+import os
 
+_base_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@db:5432/recipe_cost_db")
+TEST_DATABASE_URL = _base_url.replace("/recipe_cost_db", "/recipe_cost_test_db")
 engine = create_engine(TEST_DATABASE_URL)
 TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
